@@ -9,7 +9,6 @@ import time
 import os
 
 st.set_page_config(page_title="Employee Attrition Prediction", layout="wide", initial_sidebar_state="expanded")
-
 if 'prediction' not in st.session_state:
     st.session_state.prediction = None
 if 'prediction_proba' not in st.session_state:
