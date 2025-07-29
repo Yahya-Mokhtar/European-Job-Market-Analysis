@@ -8,10 +8,8 @@ import seaborn as sns
 import time
 import os
 
-# Set page configuration as the first Streamlit command
 st.set_page_config(page_title="Employee Attrition Prediction", layout="wide", initial_sidebar_state="expanded")
 
-# Initialize session state
 if 'prediction' not in st.session_state:
     st.session_state.prediction = None
 if 'prediction_proba' not in st.session_state:
@@ -25,7 +23,6 @@ if 'selected_tab' not in st.session_state:
 if 'last_selected_model' not in st.session_state:
     st.session_state.last_selected_model = None
 
-# Custom CSS for styling, including new background color and minimizing the header
 st.markdown("""
     <style>
     .main {
@@ -64,7 +61,6 @@ st.markdown("""
     .stMarkdown {
         color: #333333;
     }
-    /* Minimize header height */
     .stApp > header {
         height: 40px !important;
         padding: 5px 10px !important;
@@ -77,14 +73,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar with app info
 st.sidebar.title("About")
 st.sidebar.markdown("""
 This app predicts employee attrition using machine learning models.
 Select a model and input employee details to get a prediction.
 """)
 
-# Load image with error handling
 image_path = "assets/Employees_asset.jpg"
 if os.path.exists(image_path):
     st.sidebar.image(image_path, caption="Employee Attrition Predictor", use_container_width=True)
@@ -92,11 +86,9 @@ else:
     st.sidebar.info("Employee Attrition Predictor")
     st.sidebar.caption("(Image not found: Employees_asset.jpg)")
 
-# Title
 st.title("Employee Attrition Predictor")
 st.markdown("**Predict whether an employee is likely to leave with our advanced ML models.**")
 
-# Load the dataset
 @st.cache_data
 def load_data():
     return pd.read_csv('Data/aug_train.csv')
@@ -107,11 +99,9 @@ except FileNotFoundError:
     st.error("Training data file 'aug_train.csv' not found. Please ensure the file is in the same directory.")
     st.stop()
 
-# Preprocessing function
 def preprocess_input(data, le_dict, categorical_cols, model_name):
     data = data.copy()
     
-    # Handle missing values
     data['gender'] = data['gender'].fillna('Unknown')
     data['enrolled_university'] = data['enrolled_university'].fillna('no_enrollment')
     data['education_level'] = data.apply(
@@ -124,7 +114,6 @@ def preprocess_input(data, le_dict, categorical_cols, model_name):
     data['company_type'] = data['company_type'].fillna('Pvt Ltd')
     data['last_new_job'] = data['last_new_job'].fillna('1')
     
-    # Convert experience to numeric for cdi_experience
     exp_map = {
         '<1': 0.5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
         '11': 11, '12': 12, '13': 13, '14': 14, '15': 15, '16': 16, '17': 17, '18': 18, '19': 19,
@@ -132,24 +121,32 @@ def preprocess_input(data, le_dict, categorical_cols, model_name):
     }
     data['exp_numeric'] = data['experience'].map(exp_map)
     
-    # Compute cdi_experience
     data['cdi_experience'] = data['city_development_index'] * data['exp_numeric']
     
-    # Encode categorical variables
     for col in categorical_cols:
         if col in le_dict:
             try:
                 data[col] = le_dict[col].transform(data[col])
             except ValueError as e:
                 st.error(f"Error encoding {col}: {str(e)}")
-                # Handle unknown categories by assigning a default value
                 data[col] = 0
     
-    # Select features based on model
-    features =   ['city_development_index', 'enrolled_university', 'relevent_experience', 'company_size', 'cdi_experience', 'education_level', 'experience', 'gender', 'last_new_job', 'major_discipline', 'company_type', 'training_hours']
+    features = [
+        'city_development_index',
+        'company_size',
+        'cdi_experience',
+        'experience',
+        'enrolled_university',
+        'relevent_experience',
+        'company_type',
+        'gender',
+        'major_discipline',
+        'education_level',
+        'last_new_job',
+        'training_hours'
+        ]    
     return data[features]
 
-# Load LabelEncoders
 @st.cache_resource
 def load_label_encoders():
     categorical_cols = ['city', 'gender', 'relevent_experience', 'enrolled_university',
@@ -164,7 +161,6 @@ def load_label_encoders():
 
 le_dict, categorical_cols = load_label_encoders()
 
-# Model selection
 model_options = {
     'LightGBM': 'pkl_models/lightgbm_model.pkl',
     'XGBoost': 'pkl_models/xgboost_model.pkl',
@@ -174,7 +170,6 @@ model_options = {
 
 selected_model = st.sidebar.selectbox("Select Model", list(model_options.keys()))
 
-# Reset session state when model changes to prevent overlap
 if st.session_state.last_selected_model != selected_model:
     st.session_state.prediction = None
     st.session_state.prediction_proba = None
@@ -183,7 +178,6 @@ if st.session_state.last_selected_model != selected_model:
     st.session_state.selected_tab = "Input Data"
     st.session_state.last_selected_model = selected_model
 
-# Load model with error handling
 @st.cache_resource
 def load_model(model_path):
     try:
@@ -196,7 +190,6 @@ model = load_model(model_options[selected_model])
 if model is None:
     st.stop()
 
-# Tabs for navigation
 tab1, tab2, tab3 = st.tabs(["Input Data", "Prediction Results", "Model Insights"])
 
 with tab1:
@@ -234,9 +227,7 @@ with tab1:
         
         submit_button = st.form_submit_button(label="Predict Attrition")
     
-    # Display prediction summary in Input Data tab
     if submit_button:
-        # Store form data in session state
         st.session_state.form_data = {
             'city': city,
             'city_development_index': city_development_index,
@@ -252,30 +243,24 @@ with tab1:
             'training_hours': training_hours
         }
         
-        # Create DataFrame from input
         input_data = pd.DataFrame({k: [v] for k, v in st.session_state.form_data.items()})
         
-        # Preprocess input
         processed_input = preprocess_input(input_data, le_dict, categorical_cols, selected_model)
         st.session_state.processed_input = processed_input
         
-        # Make prediction
         try:
             prediction = model.predict(processed_input)
             prediction_proba = model.predict_proba(processed_input)[0]
             
-            # Store prediction results in session state
             st.session_state.prediction = prediction[0]
             st.session_state.prediction_proba = prediction_proba
             
-            # Update selected tab in session state
             st.session_state.selected_tab = "Prediction Results"
             
         except Exception as e:
             st.error(f"Error during prediction: {str(e)}")
             st.stop()
         
-        # Display summary with enhanced styling
         result = "Leave" if prediction[0] == 1 else "Stay"
         
         st.markdown("---")
@@ -301,17 +286,14 @@ with tab2:
     st.header("Prediction Results")
     
     if st.session_state.prediction is not None:
-        # Progress bar for visual effect
         st.write("Processing detailed analysis...")
         progress = st.progress(0)
         for i in range(100):
             time.sleep(0.01)
             progress.progress(i + 1)
         
-        # Clear progress bar
         progress.empty()
         
-        # Display detailed results
         if st.session_state.prediction == 1:
             st.error("**The employee is likely to leave** (Attrition: Yes)")
             risk_color = "#ff4444"
@@ -321,7 +303,6 @@ with tab2:
             risk_color = "#00aa00"
             risk_text = "LOW RISK"
         
-        # Risk assessment card
         st.markdown(f"""
         <div style="
             background-color: {risk_color}20;
@@ -335,19 +316,16 @@ with tab2:
         </div>
         """, unsafe_allow_html=True)
         
-        # Prediction confidence visualization
         st.subheader("Prediction Confidence")
         
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # Create probability chart
             fig, ax = plt.subplots(figsize=(8, 4))
             prediction_proba = st.session_state.prediction_proba
             colors = ['#008080', '#ff8c00']
             bars = ax.barh(['Stay', 'Leave'], [prediction_proba[0], prediction_proba[1]], color=colors)
             
-            # Add percentage labels on bars
             for i, (bar, prob) in enumerate(zip(bars, [prediction_proba[0], prediction_proba[1]])):
                 width = bar.get_width()
                 ax.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
@@ -358,7 +336,6 @@ with tab2:
             ax.set_title(f"Attrition Prediction Confidence - {selected_model}", fontsize=14, fontweight='bold')
             ax.grid(axis='x', alpha=0.3)
             
-            # Highlight the predicted outcome
             if st.session_state.prediction == 1:
                 bars[1].set_edgecolor('red')
                 bars[1].set_linewidth(3)
@@ -370,13 +347,11 @@ with tab2:
             st.pyplot(fig)
         
         with col2:
-            # Key statistics
             st.markdown("### Key Statistics")
             confidence = max(prediction_proba[0], prediction_proba[1])
             st.metric("Confidence Level", f"{confidence:.1%}")
             st.metric("Model Accuracy", "77.8%" if selected_model == "XGBoost" else "75.8%")
             
-            # Recommendation based on prediction
             st.markdown("### Recommendation")
             if st.session_state.prediction == 1:
                 st.markdown("""
@@ -394,7 +369,6 @@ with tab2:
                 - Consider for growth opportunities
                 """)
         
-        # Employee profile summary
         st.subheader("Employee Profile Summary")
         if st.session_state.form_data:
             col1, col2, col3 = st.columns(3)
@@ -438,7 +412,6 @@ with tab2:
 with tab3:
     st.header("Model Insights")
     
-    # Model performance metrics
     model_metrics = {
         'LightGBM': {'Accuracy': 0.7576, 'ROC AUC': 0.8017, 'Precision': 0.7234, 'Recall': 0.6891},
         'XGBoost': {'Accuracy': 0.7779, 'ROC AUC': 0.7873, 'Precision': 0.7445, 'Recall': 0.7012},
@@ -448,7 +421,6 @@ with tab3:
     
     st.subheader(f"Performance Metrics for {selected_model}")
     
-    # Display metrics in columns
     col1, col2, col3, col4 = st.columns(4)
     metrics = model_metrics[selected_model]
     
@@ -461,7 +433,6 @@ with tab3:
     with col4:
         st.metric("Recall", f"{metrics['Recall']:.1%}")
     
-    # Feature importance or coefficients
     if st.session_state.processed_input is not None:
         if selected_model in ['LightGBM', 'XGBoost'] and hasattr(model, 'feature_importances_'):
             st.subheader("Feature Importance")
@@ -471,12 +442,10 @@ with tab3:
                 'Importance': model.feature_importances_
             }).sort_values(by='Importance', ascending=False)
             
-            # Create a more detailed feature importance plot
             fig, ax = plt.subplots(figsize=(10, 6))
             bars = ax.barh(feature_importance['Feature'], feature_importance['Importance'], 
                           color='lightblue', edgecolor='navy', alpha=0.7)
             
-            # Add value labels on bars
             for bar in bars:
                 width = bar.get_width()
                 ax.text(width + 0.001, bar.get_y() + bar.get_height()/2, 
@@ -488,7 +457,6 @@ with tab3:
             plt.tight_layout()
             st.pyplot(fig)
             
-            # Feature importance insights
             st.markdown("### Key Insights:")
             top_features = feature_importance.head(3)['Feature'].tolist()
             st.markdown(f"""
@@ -513,7 +481,6 @@ with tab3:
                 bars = ax.barh(coefficients['Feature'], coefficients['Coefficient'], 
                               color=colors, alpha=0.7)
                 
-                # Add value labels
                 for bar in bars:
                     width = bar.get_width()
                     ax.text(width + (0.01 if width > 0 else -0.01), 
@@ -538,13 +505,11 @@ with tab3:
     else:
         st.info("Make a prediction first to see feature importance analysis for your specific case.")
     
-    # Model comparison
     st.subheader("Model Comparison")
     
     comparison_df = pd.DataFrame(model_metrics).T
     comparison_df = comparison_df.round(4)
     
-    # Style the dataframe
     st.dataframe(
         comparison_df.style.highlight_max(axis=0, color='lightblue').format("{:.1%}"),
         use_container_width=True
@@ -558,7 +523,6 @@ with tab3:
     - **Logistic Regression**: Most interpretable, fastest training
     """)
     
-    # Additional insights
     st.subheader("About Employee Attrition")
     st.markdown("""
     **Common factors that influence employee attrition:**
